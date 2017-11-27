@@ -7,12 +7,21 @@ from HTMLParser import HTMLParser
 
 class NFLParser(HTMLParser):
 
-	in_schedule = False
 	game_details = None
 	games = []
+
+	in_day = False
+	grab_day = False
+	current_game_day = ""
+
+	in_schedule = False
 	in_time = False
 	in_time_suff = False
 	grabbed_suff = 0
+
+	week = ""
+	in_week = False
+	in_week_selected = False
 
 	def handle_starttag(self,tag,attrs):
 		if tag == "div":
@@ -27,11 +36,10 @@ class NFLParser(HTMLParser):
 				self.game_details["home"] = attrs[3][1]
 				self.game_details["away"] = attrs[2][1]
 
-				if self.game_details not in self.games:
+				if self.game_details not in self.games and self.current_game_day != "":
 					self.games.append(self.game_details)
 
 				self.game_details = None
-
 
 		if tag == "span" and len(attrs) == 2 and self.in_schedule:
 			span_class = attrs[0]
