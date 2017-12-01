@@ -2,8 +2,128 @@
 
 import urllib
 import urllib2
+from datetime import datetime, tzinfo, timedelta
 
 from HTMLParser import HTMLParser
+
+class ESPNParser(HTMLParser):
+
+	games = {}
+	game_day_order = []
+	week = ""
+
+	in_schedule = False
+
+	grab_week = False
+	grab_games = False
+	grab_game_day = False
+
+	in_game = False
+	grab_away_team = False
+	grab_home_team = False
+	grab_abbr = False
+	grab_network = False
+
+	current_game_day = ""
+	current_game_details = None
+
+	def handle_starttag(self,tag,attrs):
+		if tag == "div" and not self.in_schedule and len(attrs) > 0:
+			if attrs[0][0] == "id" and attrs[0][1] == "schedule-page":
+				self.in_schedule = True	
+
+		elif self.in_schedule and tag == "button" and self.week == "" and len(attrs) > 1:
+			if attrs[0][0] == "class" and attrs[0][1] == "button-filter med dropdown-toggle":
+				self.grab_week = True
+
+		elif self.in_schedule and self.grab_games == False and tag == "div" and len(attrs) == 1:
+			if attrs[0][0] == "id" and attrs[0][1] == "sched-container":
+				self.grab_games = True
+
+		elif self.grab_games and tag == "h2" and len(attrs) > 0:
+			if attrs[0][0] == "class" and attrs[0][1] == "table-caption":
+				self.grab_game_day = True
+
+		elif self.grab_games and tag == "tr" and len(attrs) > 1 and not self.in_game:
+			if attrs[0][0] == "class" and (attrs[0][1] == "even" or attrs[0][1] == "odd"):
+				self.grab_away_team = False
+				self.grab_home_team = False
+				self.grab_abbr = False
+				self.grab_network = False
+				self.in_game = True
+				self.current_game_details = {}
+				self.game_details_grabbed = 0
+
+		elif self.in_game and tag == "td" and len(attrs) > 0:
+			if attrs[0][0] == "class":
+				if attrs[0][1] == "" and self.grab_away_team == False:
+					self.grab_home_team = False
+					self.grab_away_team = True
+
+				if attrs[0][1] == "home" and self.grab_home_team == False:
+					self.grab_home_team = True
+					self.grab_away_team = False
+
+				if attrs[0][1] == "network":
+					self.grab_network = True
+
+			elif attrs[0][0] == "data-behavior" and attrs[0][1] == "date_time":
+				game_time = datetime.strptime(attrs[1][1].replace("Z",""),"%Y-%m-%dT%H:%M") - timedelta(hours=5)
+				self.current_game_details["time"] = game_time.strftime("%I:%M %p EST")
+			else:
+				self.in_game = False
+
+		elif self.grab_network and tag == "a" and len(attrs) > 1:
+			#ESPN
+			if attrs[0][0] == "name" and "schedule" in attrs[0][1] and attrs[1][0] == "href" and "espn" in attrs[1][1]:
+				self.grab_network = False
+				self.current_game_details["broadcast"] = "ESPN"
+
+		elif self.in_game and tag == "img" and len(attrs) > 1:
+			if attrs[0][0] == "src" and attrs[1][0] == "class" and attrs[1][1] == "schedule-team-logo":
+				if self.grab_away_team:
+					self.current_game_details["away-image"] = attrs[0][1]
+
+				if self.grab_home_team:
+					self.current_game_details["home-image"] = attrs[0][1]
+
+		elif self.in_game and tag == "abbr" and (self.grab_away_team or self.grab_home_team) and not self.grab_abbr:
+			self.grab_abbr = True
+
+	def handle_data(self,data):
+		if self.grab_week and ("Week" in data or "Bowl" in data or "Wild" in data or "Divisional" in data or "Conference" in data):
+			self.grab_week = False
+			self.week = data
+
+		elif self.grab_game_day:
+			self.grab_game_day = False
+			self.current_game_day = data
+
+			if self.current_game_day not in self.games:
+				self.games[self.current_game_day] = []
+
+			if self.current_game_day not in self.game_day_order:
+				self.game_day_order.append(self.current_game_day)
+
+		elif self.grab_abbr:
+			self.grab_abbr = False
+
+			if self.grab_away_team:
+				self.current_game_details["away-abbr"] = data
+
+			if self.grab_home_team:
+				self.current_game_details["home-abbr"] = data
+
+		elif self.grab_network:
+			self.grab_network = False
+			self.current_game_details["broadcast"] = data
+
+	def handle_endtag(self,tag):
+		if tag == "tr" and self.in_game:
+
+			if "broadcast" in self.current_game_details:
+				self.games[self.current_game_day].append(self.current_game_details)
+			self.in_game = False
 
 class NFLParser(HTMLParser):
 
@@ -124,17 +244,19 @@ def createHTMLScheduleHead():
 
 	return createHTMLElement("thead",[],schedule_row)
 
-def createHTMLGameRow(home,away,broadcast,time):
+def createHTMLGameRow(home,home_image,away,away_image,broadcast,time):
 
 	game_time = createHTMLElement("th",[("align","left")],time)
 
-	game_home = createHTMLElement("a",[("href","/"+home)],"")
-	game_away = createHTMLElement("a",[("href","/"+away)],"")
-	game_teams = game_away+" @ "+game_home
+	game_home_image = createHTMLElement("img",[("src",home_image),("height","25"),("width","25")],"")
+	game_home = createHTMLElement("a",[],createHTMLElement("span",[],home))
+	game_away_image = createHTMLElement("img",[("src",away_image),("height","25"),("width","25")],"")
+	game_away = createHTMLElement("a",[],createHTMLElement("span",[],away))
+	game_teams = game_away_image + game_away + " @ " + game_home_image + game_home 
 	game_details = createHTMLElement("td",[("align","center")],game_teams)
 
 	
-	game_broadcaster = createHTMLElement("a",[("href","/"+home)],"")
+	game_broadcaster = createHTMLElement("a",[],broadcast)
 	game_broadcast = createHTMLElement("td",[("align","center")],game_broadcaster)
 
 	return createHTMLElement("tr",[],game_time+game_details+game_broadcast)
@@ -144,25 +266,36 @@ def createHTMLScheduleBody(games):
 	games_html = ""
 
 	for game in games:
-		games_html += createHTMLGameRow(game["home"],game["away"],game["broadcast"],game["time"])
+
+		games_html += createHTMLGameRow(game["home-abbr"],game["home-image"],game["away-abbr"],game["away-image"],game["broadcast"],game["time"])
 
 	return createHTMLElement("tbody",[],games_html)
 
-def createHTMLScheduleTable(games):
+def createHTMLScheduleTable(schedule):
 
-	html = createHTMLScheduleHead()
-	html += createHTMLScheduleBody(games)
+	scheduleTable = ""
 
-	return createHTMLElement("table",[],html)
+	for game_day in schedule.game_day_order:
+
+		games = schedule.games[game_day]
+
+		if len(games) > 0:
+			html = createHTMLElement("h2",[],game_day)
+			html += createHTMLScheduleHead()
+			html += createHTMLScheduleBody(games)
+
+			scheduleTable += createHTMLElement("table",[],html)
+
+	return scheduleTable
 
 def main():
-	html = obtainHTML("http://www.nfl.com/schedules")
+	html = obtainHTML("http://www.espn.com/nfl/schedule")
 
-	parser = NFLParser()
+	parser = ESPNParser()
 	parser.feed(html)
 
-	print parser.week
-	print createHTMLScheduleTable(parser.games)
+	print parser.games
+	print createHTMLScheduleTable(parser)
 
 	exit(0)
 
