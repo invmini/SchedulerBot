@@ -3,6 +3,7 @@ import sys, argparse
 import urllib
 import urllib2
 from datetime import datetime, tzinfo, timedelta
+from scheduleFormatter import ScheduleFormatter
 
 nfl_url = "http://www.espn.com/nfl/schedule"
 nba_url = "http://www.espn.com/nba/schedule"
@@ -232,141 +233,6 @@ def obtainHTML(url):
 	res = urllib2.urlopen(url)
 	return res.read()
 
-def createHTMLElement(element,attrs,content):
-	html = "<"
-	html += element
-
-	for attr in attrs:
-		html += " "
-		html += attr[0]
-		html += "=\""
-		html += attr[1]
-		html += "\""
-
-	html += ">"
-	html += content
-	html += "</"
-	html += element
-	html += ">"
-
-	return html
-
-def createHTMLScheduleHead():
-
-	schedule_header = createHTMLElement("th",[("align","left")],"Time")
-	schedule_header += createHTMLElement("th",[("align","center")],"Game")
-	schedule_header += createHTMLElement("th",[("align","center")],"Broadcast")
-
-	schedule_row = createHTMLElement("tr",[],schedule_header);
-
-	return createHTMLElement("thead",[],schedule_row)
-
-def createHTMLGameRow(home,home_image,away,away_image,broadcast,time):
-
-	game_time = createHTMLElement("td",[("align","left")],time)
-
-	game_home_image = createHTMLElement("img",[("src",home_image),("height","25"),("width","25")],"")
-	game_home = createHTMLElement("span",[],home)
-	game_away_image = createHTMLElement("img",[("src",away_image),("height","25"),("width","25")],"")
-	game_away = createHTMLElement("span",[],away)
-	game_teams = game_away_image + game_away + " @ " + game_home_image + game_home 
-	game_details = createHTMLElement("td",[("align","center")],game_teams)
-
-	
-	game_broadcaster = createHTMLElement("a",[],broadcast)
-	game_broadcast = createHTMLElement("td",[("align","center")],game_broadcaster)
-
-	return createHTMLElement("tr",[],game_time+game_details+game_broadcast)
-
-def createHTMLScheduleBody(games):
-
-	games_html = ""
-
-	for game in games:
-
-		games_html += createHTMLGameRow(game["home-abbr"],game["home-image"],game["away-abbr"],game["away-image"],game["broadcast"],game["time"])
-
-	return createHTMLElement("tbody",[],games_html)
-
-def createHTMLScheduleTable(schedule):
-
-	scheduleTable = createHTMLElement("h2",[],"NFL Schedule - "+schedule.week)
-
-	for game_day in schedule.game_day_order:
-
-		games = schedule.games[game_day]
-
-		if len(games) > 0:
-			html = createHTMLElement("h3",[],game_day)
-			html += createHTMLScheduleHead()
-			html += createHTMLScheduleBody(games)
-
-			scheduleTable += createHTMLElement("table",[],html)
-
-	return scheduleTable
-
-def createRedditScheduleTableHead():
-
-	return "Time|Game|Broadcast\n:--|:--:|:--:\n"
-
-def createRedditScheduleTableBody(games,schedule_type):
-
-	schedule = ""
-
-	for game in games:
-		if schedule_type == "time":
-			schedule += createRedditScheduleGame(game)
-		elif schedule_type == "score":
-			schedule += createRedditScheduleScore(game)
-
-	return schedule
-
-def createRedditScheduleGame(game):
-
-	return game["time"] + "|" + "[](/" + game["away-abbr"] + ") @ [](/" + game["home-abbr"] + ")|[](/" + game["broadcast"]+ ")\n"
-
-def createRedditScheduleScore(game):
-
-	return "[" + game["score"] + "](#s)" + "|" + "[](/" + game["away-abbr"] + ") @ [](/" + game["home-abbr"] + ")|\n"
-
-def createRedditScheduleTable(schedule,league_header,schedule_results):
-
-	schedule_table = ""
-
-	if league_header == nfl_header:
-		schedule_table += "[NFL Schedule - "+schedule.week+"]("+nfl_url+")"
-	elif league_header == nba_header:
-		schedule_table += "[NBA Schedule]("+nba_url+")"
-	elif league_header == ncaaf_header:
-		schedule_table += "[NCAA Football Schedule - "+schedule.week+"]("+ncaaf_url+")"
-
-	schedule_table = ""
-
-	for res in schedule_results:
-
-		schedule_type = res[0]
-		schedule_table += res[1]+"\n\n"
-
-		for game_day in schedule.game_day_order:
-
-			game_day_details = ""
-			games = []
-
-			for game in schedule.games[game_day]:
-				if schedule_type in game:
-					games.append(game)
-
-			if len(games) > 0:
-
-				game_day_details += createRedditScheduleTableHead()
-				game_day_details += createRedditScheduleTableBody(games,schedule_type)
-
-			if game_day_details != "":
-				schedule_table += "\n\n*"+game_day+"*\n\n"
-				schedule_table += game_day_details
-
-	return schedule_table
-
 def main():
 
 	args = argparse.ArgumentParser()
@@ -398,7 +264,7 @@ def main():
 		league_header = nfl_header
 
 	if option.date is not None:
-		if option.nfl:
+		if option.nfl or option.ncaaf:
 			schedule_url += "/_/week/" + option.date
 		elif option.nba:
 			schedule_url += "/_/date/" + option.date
@@ -415,7 +281,10 @@ def main():
 	if option.schedule:
 		schedule_results.append(("time","\n\n**Upcoming Game Schedule**"))
 
-	print createRedditScheduleTable(parser,league_header,schedule_results)
+
+	formatter = ScheduleFormatter()
+
+	print formatter.createRedditScheduleTable(parser,league_header,schedule_results)
 
 	exit(0)
 
