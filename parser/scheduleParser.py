@@ -1,8 +1,16 @@
 #!/usr/bin/python
-
+import sys, argparse
 import urllib
 import urllib2
 from datetime import datetime, tzinfo, timedelta
+
+nfl_url = "http://www.espn.com/nfl/schedule"
+nba_url = "http://www.espn.com/nba/schedule"
+ncaaf_url = "http://www.espn.com/college-football/schedule"
+
+nfl_header = "NFL Schedule"
+nba_header = "NBA Schedule"
+ncaaf_header = "NCAA Football Schedule"
 
 from HTMLParser import HTMLParser
 
@@ -55,7 +63,10 @@ class ESPNParser(HTMLParser):
 				self.game_details_grabbed = 0
 
 		elif self.in_game and tag == "td" and len(attrs) > 0:
-			if attrs[0][0] == "class":
+			if attrs[0][0] == "class" and attrs[0][1] == "live":
+				self.current_game_details["time"] = "LIVE"
+
+			elif attrs[0][0] == "class":
 				if attrs[0][1] == "" and self.grab_away_team == False:
 					self.grab_home_team = False
 					self.grab_away_team = True
@@ -70,9 +81,6 @@ class ESPNParser(HTMLParser):
 			elif attrs[0][0] == "data-behavior" and attrs[0][1] == "date_time":
 				game_time = datetime.strptime(attrs[1][1].replace("Z",""),"%Y-%m-%dT%H:%M") - timedelta(hours=5)
 				self.current_game_details["time"] = game_time.strftime("%I:%M %p EST")
-
-			elif attrs[0][0] == "class" and attrs[0][1] == "live":
-				self.current_game_details["time"] = "LIVE"
 
 			else:
 				self.in_game = False
@@ -309,9 +317,17 @@ def createRedditScheduleGame(game):
 
 	return game["time"] + "|" + "[](/" + game["away-abbr"] + ") @ [](/" + game["home-abbr"] + ")|[](/" + game["broadcast"]+ ")\n"
 
-def createRedditScheduleTable(schedule):
+def createRedditScheduleTable(schedule,league_header):
 
-	schedule_table = "[NFL Schedule - "+schedule.week+"](http://www.espn.com/nfl/schedule)"
+	schedule_table = ""
+
+	if league_header == nfl_header:
+		schedule_table += "[NFL Schedule - "+schedule.week+"]("+nfl_url+")"
+	elif league_header == nba_header:
+		schedule_table += "[NBA Schedule]("+nba_url+")"
+	elif league_header == ncaaf_header:
+		schedule_table += "[NCAA Football Schedule - "+schedule.week+"]("+ncaaf_url+")"
+
 	schedule_table += "\n\n**Upcoming Game Schedule**"
 
 	for game_day in schedule.game_day_order:
@@ -329,12 +345,38 @@ def createRedditScheduleTable(schedule):
 	return schedule_table
 
 def main():
-	html = obtainHTML("http://www.espn.com/nfl/schedule")
+
+	args = argparse.ArgumentParser()
+	args.add_argument('--nfl',action='store_true',dest='nfl',help="Create table from ESPN's NFL schedule")
+	args.add_argument('--nba',action='store_true',dest='nba',help="Create table from ESPN's NBA schedule")
+	args.add_argument('--ncaaf',action='store_true',dest='ncaaf',help="Create table from ESPN's NCAA football schedule")
+
+	option = args.parse_args()
+
+	schedule_url = nfl_url
+	league_header = ""
+
+	if option.nfl:
+		league_header = nfl_header
+		schedule_url = nfl_url
+
+	elif option.nba:
+		league_header = nba_header
+		schedule_url = nba_url
+
+	elif option.ncaaf:
+		league_header = ncaaf_header
+		schedule_url = ncaaf_url
+
+	else:
+		league_header = nfl_header
+
+	html = obtainHTML(schedule_url)
 
 	parser = ESPNParser()
 	parser.feed(html)
 
-	print createRedditScheduleTable(parser)
+	print createRedditScheduleTable(parser,league_header)
 
 	exit(0)
 
