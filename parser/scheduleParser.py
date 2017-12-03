@@ -70,6 +70,10 @@ class ESPNParser(HTMLParser):
 			elif attrs[0][0] == "data-behavior" and attrs[0][1] == "date_time":
 				game_time = datetime.strptime(attrs[1][1].replace("Z",""),"%Y-%m-%dT%H:%M") - timedelta(hours=5)
 				self.current_game_details["time"] = game_time.strftime("%I:%M %p EST")
+
+			elif attrs[0][0] == "class" and attrs[0][1] == "live":
+				self.current_game_details["time"] = "LIVE"
+
 			else:
 				self.in_game = False
 
@@ -246,12 +250,12 @@ def createHTMLScheduleHead():
 
 def createHTMLGameRow(home,home_image,away,away_image,broadcast,time):
 
-	game_time = createHTMLElement("th",[("align","left")],time)
+	game_time = createHTMLElement("td",[("align","left")],time)
 
 	game_home_image = createHTMLElement("img",[("src",home_image),("height","25"),("width","25")],"")
-	game_home = createHTMLElement("a",[],createHTMLElement("span",[],home))
+	game_home = createHTMLElement("span",[],home)
 	game_away_image = createHTMLElement("img",[("src",away_image),("height","25"),("width","25")],"")
-	game_away = createHTMLElement("a",[],createHTMLElement("span",[],away))
+	game_away = createHTMLElement("span",[],away)
 	game_teams = game_away_image + game_away + " @ " + game_home_image + game_home 
 	game_details = createHTMLElement("td",[("align","center")],game_teams)
 
@@ -273,14 +277,14 @@ def createHTMLScheduleBody(games):
 
 def createHTMLScheduleTable(schedule):
 
-	scheduleTable = ""
+	scheduleTable = createHTMLElement("h2",[],"NFL Schedule - "+schedule.week)
 
 	for game_day in schedule.game_day_order:
 
 		games = schedule.games[game_day]
 
 		if len(games) > 0:
-			html = createHTMLElement("h2",[],game_day)
+			html = createHTMLElement("h3",[],game_day)
 			html += createHTMLScheduleHead()
 			html += createHTMLScheduleBody(games)
 
@@ -288,14 +292,49 @@ def createHTMLScheduleTable(schedule):
 
 	return scheduleTable
 
+def createRedditScheduleTableHead():
+
+	return "Time|Game|Broadcast\n:--|:--:|:--:\n"
+
+def createRedditScheduleTableBody(games):
+
+	schedule = ""
+
+	for game in games:
+		schedule += createRedditScheduleGame(game)
+
+	return schedule
+
+def createRedditScheduleGame(game):
+
+	return game["time"] + "|" + "[](/" + game["away-abbr"] + ") @ [](/" + game["home-abbr"] + ")|[](/" + game["broadcast"]+ ")\n"
+
+def createRedditScheduleTable(schedule):
+
+	schedule_table = "[NFL Schedule - "+schedule.week+"](http://www.espn.com/nfl/schedule)"
+	schedule_table += "\n\n**Upcoming Game Schedule**"
+
+	for game_day in schedule.game_day_order:
+
+		games = schedule.games[game_day]
+
+		if len(games) > 0:
+
+			game_day_details = "\n\n*"+game_day+"*\n\n"
+			game_day_details += createRedditScheduleTableHead()
+			game_day_details += createRedditScheduleTableBody(games)
+
+			schedule_table += game_day_details
+
+	return schedule_table
+
 def main():
 	html = obtainHTML("http://www.espn.com/nfl/schedule")
 
 	parser = ESPNParser()
 	parser.feed(html)
 
-	print parser.games
-	print createHTMLScheduleTable(parser)
+	print createRedditScheduleTable(parser)
 
 	exit(0)
 
