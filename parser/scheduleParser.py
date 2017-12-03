@@ -31,6 +31,7 @@ class ESPNParser(HTMLParser):
 	grab_home_team = False
 	grab_abbr = False
 	grab_network = False
+	grab_score = False
 
 	current_game_day = ""
 	current_game_details = None
@@ -58,6 +59,7 @@ class ESPNParser(HTMLParser):
 				self.grab_home_team = False
 				self.grab_abbr = False
 				self.grab_network = False
+				self.grab_score = False
 				self.in_game = True
 				self.current_game_details = {}
 				self.game_details_grabbed = 0
@@ -82,14 +84,14 @@ class ESPNParser(HTMLParser):
 				game_time = datetime.strptime(attrs[1][1].replace("Z",""),"%Y-%m-%dT%H:%M") - timedelta(hours=5)
 				self.current_game_details["time"] = game_time.strftime("%I:%M %p EST")
 
-			else:
-				self.in_game = False
+		elif tag == "a" and len(attrs) > 1:
+			if self.grab_network and attrs[0][0] == "name" and attrs[1][0] == "href":
+				if "schedule" in attrs[0][1] and "espn" in attrs[1][1]:
+					self.grab_network = False
+					self.current_game_details["broadcast"] = "ESPN"
 
-		elif self.grab_network and tag == "a" and len(attrs) > 1:
-			#ESPN
-			if attrs[0][0] == "name" and "schedule" in attrs[0][1] and attrs[1][0] == "href" and "espn" in attrs[1][1]:
-				self.grab_network = False
-				self.current_game_details["broadcast"] = "ESPN"
+			elif not self.grab_network and "score" in attrs[0][1] and "game" in attrs[1][1]:
+				self.grab_score = True
 
 		elif self.in_game and tag == "img" and len(attrs) > 1:
 			if attrs[0][0] == "src" and attrs[1][0] == "class" and attrs[1][1] == "schedule-team-logo":
@@ -130,10 +132,13 @@ class ESPNParser(HTMLParser):
 			self.grab_network = False
 			self.current_game_details["broadcast"] = data
 
+		elif self.grab_score:
+			self.grab_score = False
+			self.current_game_details["score"] = data
+
 	def handle_endtag(self,tag):
 		if tag == "tr" and self.in_game:
-
-			if "broadcast" in self.current_game_details:
+			if "broadcast" in self.current_game_details or "score" in self.current_game_details:
 				self.games[self.current_game_day].append(self.current_game_details)
 			self.in_game = False
 
@@ -304,12 +309,15 @@ def createRedditScheduleTableHead():
 
 	return "Time|Game|Broadcast\n:--|:--:|:--:\n"
 
-def createRedditScheduleTableBody(games):
+def createRedditScheduleTableBody(games,schedule_type):
 
 	schedule = ""
 
 	for game in games:
-		schedule += createRedditScheduleGame(game)
+		if schedule_type == "time":
+			schedule += createRedditScheduleGame(game)
+		elif schedule_type == "score":
+			schedule += createRedditScheduleScore(game)
 
 	return schedule
 
@@ -317,7 +325,11 @@ def createRedditScheduleGame(game):
 
 	return game["time"] + "|" + "[](/" + game["away-abbr"] + ") @ [](/" + game["home-abbr"] + ")|[](/" + game["broadcast"]+ ")\n"
 
-def createRedditScheduleTable(schedule,league_header):
+def createRedditScheduleScore(game):
+
+	return "[" + game["score"] + "](#s)" + "|" + "[](/" + game["away-abbr"] + ") @ [](/" + game["home-abbr"] + ")|\n"
+
+def createRedditScheduleTable(schedule,league_header,schedule_results):
 
 	schedule_table = ""
 
@@ -328,19 +340,30 @@ def createRedditScheduleTable(schedule,league_header):
 	elif league_header == ncaaf_header:
 		schedule_table += "[NCAA Football Schedule - "+schedule.week+"]("+ncaaf_url+")"
 
-	schedule_table += "\n\n**Upcoming Game Schedule**"
+	schedule_table = ""
 
-	for game_day in schedule.game_day_order:
+	for res in schedule_results:
 
-		games = schedule.games[game_day]
+		schedule_type = res[0]
+		schedule_table += res[1]+"\n\n"
 
-		if len(games) > 0:
+		for game_day in schedule.game_day_order:
 
-			game_day_details = "\n\n*"+game_day+"*\n\n"
-			game_day_details += createRedditScheduleTableHead()
-			game_day_details += createRedditScheduleTableBody(games)
+			game_day_details = ""
+			games = []
 
-			schedule_table += game_day_details
+			for game in schedule.games[game_day]:
+				if schedule_type in game:
+					games.append(game)
+
+			if len(games) > 0:
+
+				game_day_details += createRedditScheduleTableHead()
+				game_day_details += createRedditScheduleTableBody(games,schedule_type)
+
+			if game_day_details != "":
+				schedule_table += "\n\n*"+game_day+"*\n\n"
+				schedule_table += game_day_details
 
 	return schedule_table
 
@@ -350,6 +373,9 @@ def main():
 	args.add_argument('--nfl',action='store_true',dest='nfl',help="Create table from ESPN's NFL schedule")
 	args.add_argument('--nba',action='store_true',dest='nba',help="Create table from ESPN's NBA schedule")
 	args.add_argument('--ncaaf',action='store_true',dest='ncaaf',help="Create table from ESPN's NCAA football schedule")
+	args.add_argument('--scores',action='store_true',dest='score',help="Include finished games in table")
+	args.add_argument('--schedule',action='store_true',dest='schedule',help="Include future games in table")
+	args.add_argument('--date',dest='date',help="Date of schedule to parse, NBA: yearmonthday eg. --nba --date 20171108, NFL: week, eg. --nfl --date 7")
 
 	option = args.parse_args()
 
@@ -371,12 +397,25 @@ def main():
 	else:
 		league_header = nfl_header
 
+	if option.date is not None:
+		if option.nfl:
+			schedule_url += "/_/week/" + option.date
+		elif option.nba:
+			schedule_url += "/_/date/" + option.date
+
 	html = obtainHTML(schedule_url)
 
 	parser = ESPNParser()
 	parser.feed(html)
 
-	print createRedditScheduleTable(parser,league_header)
+	schedule_results = []
+	
+	if option.score:
+		schedule_results.append(("score","\n\n**Game Results**"))
+	if option.schedule:
+		schedule_results.append(("time","\n\n**Upcoming Game Schedule**"))
+
+	print createRedditScheduleTable(parser,league_header,schedule_results)
 
 	exit(0)
 
