@@ -7,6 +7,8 @@ nfl_header = "NFL Schedule"
 nba_header = "NBA Schedule"
 ncaaf_header = "NCAA Football Schedule"
 
+team_name = {"ATL":"hawks","BKN":"nets","BOS":"celtics","CHA":"hornets","CHI":"bulls","CLE":"cavs","DAL":"mavericks","DEN":"nuggets","DET":"pistons","GS":"warriors","HOU":"rockets","IND":"pacers","LAC":"clippers","LAL":"lakers","MEM":"grizzlies","MIA":"heat","MIL":"bucks","MIN":"timberwolves","NO":"pelicans","NY":"knicks","OKC":"thunder","ORL":"magic","PHI":"sixers","PHX":"suns","POR":"trailblazers","SAC":"kings","SA":"spurs","TOR":"raptors","UTAH":"jazz","WSH":"wizards"}
+
 class ScheduleFormatter():
 
 	sport = "football"
@@ -66,20 +68,23 @@ def createRedditScheduleTableBody(games,schedule_type,sport):
 
 	for game in games:
 		if schedule_type == "time":
-			schedule += createRedditScheduleGame(game)
+			schedule += createRedditScheduleGame(game,sport)
 		elif schedule_type == "score":
 			schedule += createRedditScheduleScore(game,sport)
 
 	return schedule
 
-def createRedditScheduleGame(game):
+def createRedditScheduleGame(game,sport):
 
-	return game["time"] + "|" + "[](/" + game["away-abbr"] + ") @ [](/" + game["home-abbr"] + ")|[](/" + game["broadcast"]+ ")\n"
+	if sport == "football":
+		return game["time"] + "|" + "[](/" + game["away-abbr"] + ") @ [](/" + game["home-abbr"] + ")|[](/" + game["broadcast"]+ ")\n"
+	else:
+		return game["time"] + "|" + "[](/" + team_name[game["away-abbr"]] + ") @ [](/" + team_name[game["home-abbr"]] + ")|[](/" + game["broadcast"]+ ")\n"
 
 def createRedditScheduleScore(game,sport):
 
 	if sport == "football":
 		return "[" + game["score"] + "](#s)" + "|" + "[](/" + game["away-abbr"] + ") @ [](/" + game["home-abbr"] + ")|"+ game["player-details"][0] + "|" + game["player-details"][1] + "|" + game["player-details"][2]  + "\n"
 	else:
-		return "[" + game["score"] + "](#s)" + "|" + "[](/" + game["away-abbr"] + ") @ [](/" + game["home-abbr"] + ")|"+ game["player-details"][0] + "|" + game["player-details"][1] +"\n"
+		return "[" + game["score"] + "](#s)" + "|" + "[](/" + team_name[game["away-abbr"]] + ") @ [](/" + team_name[game["home-abbr"]] + ")|"+ game["player-details"][0] + "|" + game["player-details"][1] +"\n"
 
