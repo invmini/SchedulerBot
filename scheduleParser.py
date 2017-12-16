@@ -74,7 +74,7 @@ class ESPNParser(HTMLParser):
 
 			elif attrs[0][0] == "data-behavior" and attrs[0][1] == "date_time":
 				game_time = datetime.strptime(attrs[1][1].replace("Z",""),"%Y-%m-%dT%H:%M") - timedelta(hours=5)
-				self.current_game_details["time"] = game_time.strftime("%I:%M %p EST")
+				self.current_game_details["time"] = game_time.strftime("%I:%M %p ET")
 
 		elif tag == "a" and len(attrs) > 1:
 			if self.grab_network and attrs[0][0] == "name" and attrs[1][0] == "href":

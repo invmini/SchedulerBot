@@ -7,7 +7,11 @@ nfl_header = "NFL Schedule"
 nba_header = "NBA Schedule"
 ncaaf_header = "NCAA Football Schedule"
 
+start_schedule = "[](/start-schedule)"
+end_schedule = "[](/end-schedule)"
+
 team_name = {"ATL":"hawks","BKN":"nets","BOS":"celtics","CHA":"hornets","CHI":"bulls","CLE":"cavs","DAL":"mavericks","DEN":"nuggets","DET":"pistons","GS":"warriors","HOU":"rockets","IND":"pacers","LAC":"clippers","LAL":"lakers","MEM":"grizzlies","MIA":"heat","MIL":"bucks","MIN":"timberwolves","NO":"pelicans","NY":"knicks","OKC":"thunder","ORL":"magic","PHI":"sixers","PHX":"suns","POR":"trailblazers","SAC":"kings","SA":"spurs","TOR":"raptors","UTAH":"jazz","WSH":"wizards"}
+team_city = {"ATL":"Atlanta","BKN":"Brooklyn","BOS":"Boston","CHA":"Charlotte","CHI":"Chicago","CLE":"Cleveland","DAL":"Dallas","DEN":"Denver","DET":"Detriot","GS":"Golden State","HOU":"Houston","IND":"Indiana","LAC":"LA Clippers","LAL":"LA Lakers","MEM":"Memphis","MIA":"Miami","MIL":"Milwaukee ","MIN":"Minnesota","NO":"New Orleans","NY":"New York","OKC":"Oklahoma City","ORL":"Orlando","PHI":"Philadelphia","PHX":"Pheonix","POR":"Portland","SAC":"Sacramento","SA":"San Antonio","TOR":"Toronto","UTAH":"Utah","WSH":"Washington"}
 
 class ScheduleFormatter():
 
@@ -15,17 +19,15 @@ class ScheduleFormatter():
 
 	def createRedditScheduleTable(self,schedule,league_header,schedule_results):
 
-		schedule_table = ""
+		schedule_table = start_schedule+"\n"
 
 		if league_header == nfl_header:
-			schedule_table += "[NFL Schedule - "+schedule.week+"]("+nfl_url+")"
+			schedule_table += "###**[NFL Schedule - "+schedule.week+"]("+nfl_url+")**"
 		elif league_header == nba_header:
 			self.sport = "basketball"
-			schedule_table += "[NBA Schedule]("+nba_url+")"
+			schedule_table += "###**[NBA Schedule]("+nba_url+")**"
 		elif league_header == ncaaf_header:
-			schedule_table += "[NCAA Football Schedule - "+schedule.week+"]("+ncaaf_url+")"
-
-		schedule_table = ""
+			schedule_table += "###**[NCAA Football Schedule - "+schedule.week+"]("+ncaaf_url+")**"
 
 		for res in schedule_results:
 
@@ -50,7 +52,22 @@ class ScheduleFormatter():
 					schedule_table += "\n\n*"+game_day+"*\n\n"
 					schedule_table += game_day_details
 
-		return schedule_table
+		return schedule_table+"\n"+end_schedule
+
+	def updateSidebarSchedule(self,sidebar,schedule):
+
+		if start_schedule in sidebar and end_schedule in sidebar:
+			sidebar_start_split = sidebar.split(start_schedule)
+			sidebar_end_split = sidebar.split(end_schedule)
+
+			if len(sidebar_start_split) == 2 and len(sidebar_end_split) == 2:
+				return sidebar_start_split[0] + schedule + sidebar_end_split[1]
+			else:
+				return sidebar
+
+		else:
+			return sidebar
+		
 
 def createRedditScheduleTableHead(schedule_type,sport):
 
@@ -58,9 +75,9 @@ def createRedditScheduleTableHead(schedule_type,sport):
 		return "Time|Game|Broadcast\n:--|:--:|:--:\n"
 	elif schedule_type == "score":
 		if sport == "football":
-			return "Result|Game|Passing|Rushing|Receiving\n:--|:--:|:--|:--|:--\n"
+			return "Game|Result|Passing|Rushing|Receiving\n:--|:--:|:--|:--|:--\n"
 		else:
-			return "Result|Game|Winner High|Loser High\n:--|:--:|:--|:--\n"
+			return "Game|Result (Winner,Loser)|Winner High|Loser High\n:--|:--:|:--|:--\n"
 
 def createRedditScheduleTableBody(games,schedule_type,sport):
 
@@ -84,7 +101,7 @@ def createRedditScheduleGame(game,sport):
 def createRedditScheduleScore(game,sport):
 
 	if sport == "football":
-		return "[" + game["score"] + "](#s)" + "|" + "[](/" + game["away-abbr"] + ") @ [](/" + game["home-abbr"] + ")|"+ game["player-details"][0] + "|" + game["player-details"][1] + "|" + game["player-details"][2]  + "\n"
+		return "[](/" + game["away-abbr"] + ") @ [](/" + game["home-abbr"] + ")|" + "[" + game["score"] + "](#s)|[" + game["player-details"][0] + "](#s)|[" + game["player-details"][1] + "](#s)|[" + game["player-details"][2]  + "](#s)\n"
 	else:
-		return "[" + game["score"] + "](#s)" + "|" + "[](/" + team_name[game["away-abbr"]] + ") @ [](/" + team_name[game["home-abbr"]] + ")|"+ game["player-details"][0] + "|" + game["player-details"][1] +"\n"
+		return team_city[game["away-abbr"]] +" @ " + team_city[game["home-abbr"]] + "|" + "[" + game["score"] + "](#s)|[" + game["player-details"][0] + "](#s)|[" + game["player-details"][1] +"](#s)\n"
 

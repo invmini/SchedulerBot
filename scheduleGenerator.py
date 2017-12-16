@@ -64,7 +64,6 @@ def main():
 	if option.schedule:
 		schedule_results.append(("time","\n\n**Upcoming Game Schedule**"))
 
-
 	formatter = ScheduleFormatter()
 
 	print formatter.createRedditScheduleTable(parser,league_header,schedule_results)
