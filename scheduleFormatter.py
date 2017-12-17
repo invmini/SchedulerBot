@@ -52,6 +52,9 @@ class ScheduleFormatter():
 					schedule_table += "\n\n*"+game_day+"*\n\n"
 					schedule_table += game_day_details
 
+				if self.sport == "basketball":
+					break
+
 		return schedule_table+"\n"+end_schedule
 
 	def updateSidebarSchedule(self,sidebar,schedule):
