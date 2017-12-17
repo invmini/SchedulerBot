@@ -28,6 +28,7 @@ def main():
 	args.add_argument('--date',dest='date',help="Date of schedule to parse, NBA: yearmonthday eg. --nba --date 20171108, NFL: week, eg. --nfl --date 7")
 	args.add_argument('--username',dest='username',default=None,help="accout username")
 	args.add_argument('--password',dest='password',default=None,help="account username")
+	args.add_argument('--secret',dest='secret',default=None,help="app secret")
 	args.add_argument('--update',dest='subreddit',default=None,help="subreddit to update")
 
 	option = args.parse_args()
@@ -74,10 +75,11 @@ def main():
 	subreddit = option.subreddit
 
 	if subreddit is not None:
-		if option.username is not None and option.password is not None:
+		if option.username is not None and option.password is not None and option.secret is not None:
 			reddit = Reddit()
 			reddit.username = option.username
 			reddit.password = option.password
+			reddit.client_secret = option.secret
 
 			reddit.request_new_token()
 
